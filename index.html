@@ -356,9 +356,10 @@
 
 <script>
   // ══════════════════════════════════════════════
-  //  CONFIGURAÇÃO — apenas isso precisa ser alterado
+  //  CONFIGURAÇÃO
   // ══════════════════════════════════════════════
-  const WEBHOOK_URL = 'https://dinastia-n8n-webhook.saxddq.easypanel.host/webhook/mam-cobranca';
+  const ASAAS_KEY         = '$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjFjMGFhNjczLTBkZWQtNDJlMS1iZDBhLTE0MjlhYmQyN2EyMDo6JGFhY2hfNzE0OTU0NmQtOTE1Mi00ZWY2LTg2YWUtOWQ4NGRhNzRjNjFh';
+  const ASAAS_BASE        = 'https://api.asaas.com/api/v3';
   // ══════════════════════════════════════════════
 
   let metodo = 'PIX';
@@ -417,22 +418,33 @@
     const valor = valorNum();
     if (valor <= 0) { showError('Informe um valor maior que zero.'); resetBtn(); return; }
 
-    const payload = {
-      descricao:   document.getElementById('descricao').value.trim(),
-      valor,
-      billingType: metodo,
-      parcelas:    metodo === 'CREDIT_CARD' ? parcelas : 1,
-    };
+    const descricao = document.getElementById('descricao').value.trim();
 
     try {
-      const res  = await fetch(WEBHOOK_URL, {
+      const vencimento = new Date();
+      vencimento.setDate(vencimento.getDate() + 30);
+      const vencStr = vencimento.toISOString().split('T')[0];
+
+      const body = {
+        billingType:      metodo,
+        value:            valor,
+        dueDate:          vencStr,
+        description:      descricao || 'Seguro · M.A.M Corretora',
+        installmentCount: metodo === 'CREDIT_CARD' ? parcelas : 1,
+        installmentValue: metodo === 'CREDIT_CARD'
+          ? parseFloat((valor / parcelas).toFixed(2))
+          : valor,
+      };
+
+      const cobRes = await fetch(`${ASAAS_BASE}/payments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_KEY },
+        body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || data.message || 'Erro ao processar cobrança.');
-      showSuccess(data, valor);
+      const cobData = await cobRes.json();
+      if (!cobRes.ok) throw new Error(cobData.errors?.[0]?.description || cobData.description || 'Erro ao criar cobrança.');
+
+      showSuccess(cobData, valor);
     } catch (err) {
       showError(err.message);
     } finally {
