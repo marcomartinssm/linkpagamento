@@ -358,8 +358,7 @@
   // ══════════════════════════════════════════════
   //  CONFIGURAÇÃO
   // ══════════════════════════════════════════════
-  const ASAAS_KEY         = '$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjFjMGFhNjczLTBkZWQtNDJlMS1iZDBhLTE0MjlhYmQyN2EyMDo6JGFhY2hfNzE0OTU0NmQtOTE1Mi00ZWY2LTg2YWUtOWQ4NGRhNzRjNjFh';
-  const ASAAS_BASE        = 'https://api.asaas.com/api/v3';
+  const WEBHOOK_URL = 'https://dinastia-n8n-webhook.saxddq.easypanel.host/webhook/mam-cobranca';
   // ══════════════════════════════════════════════
 
   let metodo = 'PIX';
@@ -421,30 +420,19 @@
     const descricao = document.getElementById('descricao').value.trim();
 
     try {
-      const vencimento = new Date();
-      vencimento.setDate(vencimento.getDate() + 30);
-      const vencStr = vencimento.toISOString().split('T')[0];
-
-      const body = {
-        billingType:      metodo,
-        value:            valor,
-        dueDate:          vencStr,
-        description:      descricao || 'Seguro · M.A.M Corretora',
-        installmentCount: metodo === 'CREDIT_CARD' ? parcelas : 1,
-        installmentValue: metodo === 'CREDIT_CARD'
-          ? parseFloat((valor / parcelas).toFixed(2))
-          : valor,
-      };
-
-      const cobRes = await fetch(`${ASAAS_BASE}/payments`, {
+      const res = await fetch(WEBHOOK_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_KEY },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao,
+          valor,
+          billingType: metodo,
+          parcelas: metodo === 'CREDIT_CARD' ? parcelas : 1,
+        }),
       });
-      const cobData = await cobRes.json();
-      if (!cobRes.ok) throw new Error(cobData.errors?.[0]?.description || cobData.description || 'Erro ao criar cobrança.');
-
-      showSuccess(cobData, valor);
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Erro ao processar cobrança.');
+      showSuccess(data, valor);
     } catch (err) {
       showError(err.message);
     } finally {
